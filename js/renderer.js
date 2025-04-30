@@ -1,18 +1,33 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// 图形对象配置
-const circle = {
-    x: 100, y: 100, radius: 20,
-    baseRadius: 20,
+// 加载图片资源
+const images = {
+    hero: new Image(),
+    monster: new Image()
+};
+
+images.hero.src = 'images/monster.png';
+images.monster.src = 'images/hero.png';
+
+// 游戏对象配置
+const hero = {
+    x: 100,
+    y: 100,
+    width: 50,   // 根据图片实际尺寸调整
+    height: 50,  // 根据图片实际尺寸调整
+    baseSize: 50,
     visible: true,
     isAnimating: false,
     alpha: 1
 };
 
-const rect = {
-    x: 400, y: 300, width: 50, height: 50,
-    baseWidth: 50, baseHeight: 50,
+const monster = {
+    x: 400,
+    y: 300,
+    width: 60,   // 根据图片实际尺寸调整
+    height: 60,  // 根据图片实际尺寸调整
+    baseSize: 60,
     visible: true,
     isAnimating: false,
     alpha: 1
@@ -22,110 +37,106 @@ let isColliding = false;
 let animationStartTime = 0;
 const ANIMATION_DURATION = 1000;
 
-// 新增鼠标控制变量
+// 鼠标控制变量
 let isDragging = false;
 let dragOffset = { x: 0, y: 0 };
 
-// 监听键盘事件（速度提升至 15）
+// 键盘控制（控制怪物移动）
 document.addEventListener('keydown', (e) => {
-    if (circle.isAnimating || rect.isAnimating) return;
-    const speed = 15; // 速度从 5 提升到 15
+    if (hero.isAnimating || monster.isAnimating) return;
+    const speed = 15;
     switch (e.key) {
-        case 'ArrowUp': rect.y -= speed; break;
-        case 'ArrowDown': rect.y += speed; break;
-        case 'ArrowLeft': rect.x -= speed; break;
-        case 'ArrowRight': rect.x += speed; break;
+        case 'ArrowUp': monster.y -= speed; break;
+        case 'ArrowDown': monster.y += speed; break;
+        case 'ArrowLeft': monster.x -= speed; break;
+        case 'ArrowRight': monster.x += speed; break;
     }
 });
 
-// 新增鼠标事件监听
+// 鼠标控制（控制英雄）
 canvas.addEventListener('mousedown', (e) => {
-    if (circle.isAnimating || rect.isAnimating) return;
+    if (hero.isAnimating || monster.isAnimating) return;
 
-    // 转换鼠标坐标为画布内坐标
-    const rectCanvas = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rectCanvas.left;
-    const mouseY = e.clientY - rectCanvas.top;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
 
-    // 检测是否点击在矩形内部
+    // 检测是否点击在英雄范围内
     if (
-        mouseX >= rect.x &&
-        mouseX <= rect.x + rect.width &&
-        mouseY >= rect.y &&
-        mouseY <= rect.y + rect.height
+        mouseX >= hero.x &&
+        mouseX <= hero.x + hero.width &&
+        mouseY >= hero.y &&
+        mouseY <= hero.y + hero.height
     ) {
         isDragging = true;
-        dragOffset.x = mouseX - rect.x;
-        dragOffset.y = mouseY - rect.y;
+        dragOffset.x = mouseX - hero.x;
+        dragOffset.y = mouseY - hero.y;
     }
 });
 
 canvas.addEventListener('mousemove', (e) => {
-    if (!isDragging || circle.isAnimating || rect.isAnimating) return;
+    if (!isDragging || hero.isAnimating || monster.isAnimating) return;
 
-    const rectCanvas = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rectCanvas.left;
-    const mouseY = e.clientY - rectCanvas.top;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
 
-    // 更新矩形位置（跟随鼠标）
-    rect.x = mouseX - dragOffset.x;
-    rect.y = mouseY - dragOffset.y;
+    // 更新英雄位置
+    hero.x = mouseX - dragOffset.x;
+    hero.y = mouseY - dragOffset.y;
 
-    // 边界限制（可选）
-    rect.x = Math.max(0, Math.min(rect.x, canvas.width - rect.width));
-    rect.y = Math.max(0, Math.min(rect.y, canvas.height - rect.height));
+    // 边界限制
+    hero.x = Math.max(0, Math.min(hero.x, canvas.width - hero.width));
+    hero.y = Math.max(0, Math.min(hero.y, canvas.height - hero.height));
 });
 
 canvas.addEventListener('mouseup', () => {
     isDragging = false;
 });
 
-// 碰撞检测（保持不变）
+// 碰撞检测（基于包围盒）
 function checkCollision() {
-    const closestX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.width));
-    const closestY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.height));
-    const dx = circle.x - closestX;
-    const dy = circle.y - closestY;
-    return (dx * dx + dy * dy) < (circle.radius * circle.radius);
+    return (
+        hero.x < monster.x + monster.width &&
+        hero.x + hero.width > monster.x &&
+        hero.y < monster.y + monster.height &&
+        hero.y + hero.height > monster.y
+    );
 }
 
-// 双对象震动算法
-function dualShake() {
-    const intensity = 3; // 降低震动强度
+// 震动效果
+function shake() {
+    const intensity = 3;
     const now = Date.now();
     const timeFactor = (now - animationStartTime) / ANIMATION_DURATION;
-
-    // 随时间衰减震动强度
     const currentIntensity = intensity * (1 - timeFactor);
 
-    // 圆形震动
-    circle.x += (Math.random() - 0.5) * currentIntensity;
-    circle.y += (Math.random() - 0.5) * currentIntensity;
-
-    // 矩形震动
-    rect.x += (Math.random() - 0.5) * currentIntensity;
-    rect.y += (Math.random() - 0.5) * currentIntensity;
+    hero.x += (Math.random() - 0.5) * currentIntensity;
+    hero.y += (Math.random() - 0.5) * currentIntensity;
+    monster.x += (Math.random() - 0.5) * currentIntensity;
+    monster.y += (Math.random() - 0.5) * currentIntensity;
 }
 
-// 双对象渐隐缩小
-function dualFade() {
+// 渐隐效果
+function fadeOut() {
     const progress = (Date.now() - animationStartTime) / ANIMATION_DURATION;
 
-    // 透明度变化
-    circle.alpha = 1 - progress;
-    rect.alpha = 1 - progress;
+    // 更新透明度
+    hero.alpha = 1 - progress;
+    monster.alpha = 1 - progress;
 
-    // 尺寸变化
-    circle.radius = circle.baseRadius * (1 - progress);
-    rect.width = rect.baseWidth * (1 - progress);
-    rect.height = rect.baseHeight * (1 - progress);
+    // 更新尺寸
+    const scale = Math.max(0.1, 1 - progress);
+    hero.width = hero.baseSize * scale;
+    hero.height = hero.baseSize * scale;
+    monster.width = monster.baseSize * scale;
+    monster.height = monster.baseSize * scale;
 
-    // 动画结束处理
     if (progress >= 1) {
-        circle.visible = false;
-        rect.visible = false;
-        circle.isAnimating = false;
-        rect.isAnimating = false;
+        hero.visible = false;
+        monster.visible = false;
+        hero.isAnimating = false;
+        monster.isAnimating = false;
     }
 }
 
@@ -133,40 +144,56 @@ function dualFade() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 绘制矩形（带透明度）
-    if (rect.visible) {
+    // 绘制怪物
+    if (monster.visible) {
         ctx.save();
-        ctx.globalAlpha = rect.alpha;
-        ctx.fillStyle = 'blue';
-        ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+        ctx.globalAlpha = monster.alpha;
+        ctx.drawImage(
+            images.monster,
+            monster.x,
+            monster.y,
+            monster.width,
+            monster.height
+        );
         ctx.restore();
     }
 
-    // 绘制圆形（带透明度）
-    if (circle.visible) {
+    // 绘制英雄
+    if (hero.visible) {
         ctx.save();
-        ctx.globalAlpha = circle.alpha;
-        ctx.beginPath();
-        ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
-        ctx.fillStyle = 'red';
-        ctx.fill();
+        ctx.globalAlpha = hero.alpha;
+        ctx.drawImage(
+            images.hero,
+            hero.x,
+            hero.y,
+            hero.width,
+            hero.height
+        );
         ctx.restore();
     }
 
-    // 碰撞检测与动画触发
-    if (checkCollision() && !circle.isAnimating) {
+    // 碰撞检测与动画处理
+    if (checkCollision() && !hero.isAnimating) {
         animationStartTime = Date.now();
-        circle.isAnimating = true;
-        rect.isAnimating = true;
+        hero.isAnimating = true;
+        monster.isAnimating = true;
     }
 
-    // 执行动画
-    if (circle.isAnimating) {
-        dualShake();
-        dualFade();
+    if (hero.isAnimating) {
+        shake();
+        fadeOut();
     }
 
     requestAnimationFrame(draw);
 }
 
-draw();
+// 等待图片加载完成后启动
+let imagesLoaded = 0;
+Object.values(images).forEach(img => {
+    img.onload = () => {
+        imagesLoaded++;
+        if (imagesLoaded === Object.keys(images).length) {
+            draw();
+        }
+    };
+});
